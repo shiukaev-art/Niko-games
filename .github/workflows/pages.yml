@@ -26,6 +26,19 @@ jobs:
           mkdir /tmp/niko-site
           unzip -q /tmp/niko-v15.zip -d /tmp/niko-site
           test -f /tmp/niko-site/club.html
+      - name: Fix cartridge URLs for GitHub Pages
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('/tmp/niko-site/retro/catalog.js')
+          s = p.read_text()
+          old = 'timedFetch(item.path, 45000)'
+          assert old in s
+          p.write_text(s.replace(old, "timedFetch('/Niko-games' + item.path, 45000)"))
+          p = Path('/tmp/niko-site/sw.js')
+          s = p.read_text()
+          p.write_text(s.replace("const CACHE = '", "const CACHE = 'pagesfix1-"))
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
