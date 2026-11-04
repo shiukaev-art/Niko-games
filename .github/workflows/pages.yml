@@ -34,10 +34,10 @@ jobs:
           s = p.read_text()
           old = 'timedFetch(item.path, 45000)'
           assert old in s
-          p.write_text(s.replace(old, "timedFetch('/Niko-games' + item.path, 45000)"))
+          p.write_text(s.replace(old, "timedFetch((item.path.startsWith('/Niko-games/') ? item.path : '/Niko-games' + item.path), 45000)"))
           p = Path('/tmp/niko-site/sw.js')
           s = p.read_text()
-          p.write_text(s.replace("const CACHE = '", "const CACHE = 'pagesfix1-"))
+          p.write_text(s.replace("const CACHE = '", "const CACHE = 'pagesfix2-"))
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
@@ -45,3 +45,4 @@ jobs:
           path: /tmp/niko-site
       - uses: actions/deploy-pages@v4
         id: deployment
+
