@@ -1,0 +1,34 @@
+name: Publish NIKO ARCADE v15
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: niko-pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare verified v15 website
+        shell: bash
+        run: |
+          cat v15-final-*.bin > /tmp/niko-v15.zip
+          echo '640c147d0f1295dfe9e9b8ef893be903086348e80d26eba6b753d3f8fa0d6680  /tmp/niko-v15.zip' | sha256sum -c -
+          unzip -tq /tmp/niko-v15.zip
+          mkdir /tmp/niko-site
+          unzip -q /tmp/niko-v15.zip -d /tmp/niko-site
+          test -f /tmp/niko-site/club.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/niko-site
+      - uses: actions/deploy-pages@v4
+        id: deployment
