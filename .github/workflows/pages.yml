@@ -7,6 +7,7 @@ on:
       - '.github/workflows/pages.yml'
       - 'tools/fix_site_v17.py'
       - 'tools/upgrade_v18.py'
+      - 'tools/site-v18-overlay.zip'
       - 'tools/verify_site_v18.py'
       - 'tools/sw_offline_smoke_v17.js'
       - 'tools/test_retro_catalog_v18.js'
@@ -48,8 +49,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -W ignore tools/fix_site_v17.py /tmp/niko-site
-          python3 tools/upgrade_v18.py /tmp/niko-site
+          SITE="$(cat /tmp/niko-site-path)"
+          unzip -oq tools/site-v18-overlay.zip -d "$SITE"
+          rm -rf "$SITE/music-studio" "$SITE/intro" "$SITE/tabletop"
       - name: Verify every page, file and cartridge
         shell: bash
         run: |
