@@ -1,48 +1,88 @@
-name: Publish NIKO ARCADE v15
+name: Publish NIKO ARCADE v18 (fixed games)
+
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/pages.yml'
+      - 'tools/fix_site_v17.py'
+      - 'tools/upgrade_v18.py'
+      - 'tools/verify_site_v18.py'
+      - 'tools/sw_offline_smoke_v17.js'
+      - 'tools/test_retro_catalog_v18.js'
+      - 'tools/browser_smoke_v18.py'
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: niko-pages
   cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare verified v15 website
+      - name: Unpack previously uploaded v15 game (do not re-upload large ROMs)
         shell: bash
         run: |
+          set -euo pipefail
           cat v15-final-*.bin > /tmp/niko-v15.zip
           echo '640c147d0f1295dfe9e9b8ef893be903086348e80d26eba6b753d3f8fa0d6680  /tmp/niko-v15.zip' | sha256sum -c -
           unzip -tq /tmp/niko-v15.zip
-          mkdir /tmp/niko-site
+          mkdir -p /tmp/niko-site
           unzip -q /tmp/niko-v15.zip -d /tmp/niko-site
-          test -f /tmp/niko-site/club.html
-      - name: Fix cartridge URLs for GitHub Pages
+          if [ -f /tmp/niko-site/public/club.html ]; then
+            echo '/tmp/niko-site/public' > /tmp/niko-site-path
+          else
+            echo '/tmp/niko-site' > /tmp/niko-site-path
+          fi
+      - name: Apply game + offline + retro + music-removal fixes
+        shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('/tmp/niko-site/retro/catalog.js')
-          s = p.read_text()
-          old = 'timedFetch(item.path, 45000)'
-          assert old in s
-          p.write_text(s.replace(old, "timedFetch((item.path.startsWith('/Niko-games/') ? item.path : '/Niko-games' + item.path), 45000)"))
-          p = Path('/tmp/niko-site/sw.js')
-          s = p.read_text()
-          p.write_text(s.replace("const CACHE = '", "const CACHE = 'pagesfix2-"))
-          PY
+          set -euo pipefail
+          python3 -W ignore tools/fix_site_v17.py /tmp/niko-site
+          python3 tools/upgrade_v18.py /tmp/niko-site
+      - name: Verify every page, file and cartridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          SITE="$(cat /tmp/niko-site-path)"
+          python3 tools/verify_site_v18.py "$SITE"
+          node tools/sw_offline_smoke_v17.js "$SITE"
+          node tools/test_retro_catalog_v18.js "$SITE"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare Chrome browser tests
+        run: |
+          python3 -m pip install playwright==1.56.0
+          python3 -m playwright install --with-deps chromium
+      - name: Verify every screen in a mobile browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          SITE="$(cat /tmp/niko-site-path)"
+          mkdir -p /tmp/niko-http
+          ln -s "$SITE" /tmp/niko-http/Niko-games
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/niko-http >/tmp/niko-http.log 2>&1 &
+          sleep 2
+          python3 tools/browser_smoke_v18.py
+      - name: Export exact built site path
+        id: buildpath
+        shell: bash
+        run: echo "site=$(cat /tmp/niko-site-path)" >> "$GITHUB_OUTPUT"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: /tmp/niko-site
-      - uses: actions/deploy-pages@v4
+          path: ${{ steps.buildpath.outputs.site }}
+      - name: Deploy site
         id: deployment
-
+        uses: actions/deploy-pages@v4
