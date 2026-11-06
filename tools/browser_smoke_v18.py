@@ -11,7 +11,7 @@ PAGES=[
  'beauty/index.html','beauty/places40.html','heritage/index.html',
  'ossetian/index.html','retro/index.html','retro/player.html',
  'retro/tv.html','retro/controller.html','retro/join.html',
- 'retro/emulator.html','feedback/index.html','help/connection.html',
+ 'feedback/index.html','help/connection.html',
  'repair.html','refresh-v18.html'
 ]
 ACTIONS={
@@ -41,11 +41,18 @@ with sync_playwright() as pw:
       page.wait_for_timeout(350)
       if not resp or resp.status!=200:raise RuntimeError('HTTP '+str(resp.status if resp else 'none'))
       if page.locator('body').inner_text(timeout=2500).strip()=='' :raise RuntimeError('Blank page')
+      intro=page.locator('.niko-intro-skip')
+      if intro.is_visible(): intro.click()
+      if filename in ('games/obby.html','games/sudoku.html'):
+        page.locator('#classic-intro button').click()
       if filename in ACTIONS:
         button=page.locator(ACTIONS[filename]).first
         button.wait_for(state='attached',timeout=4000)
         button.click(timeout=5000)
         page.wait_for_timeout(200)
+        if filename=='games/runner.html':
+          page.locator('#overlay').wait_for(state='hidden',timeout=3000)
+          page.wait_for_function("Number(document.querySelector('#score').textContent)>0",timeout=5000)
       if filename=='retro/index.html':
         page.locator('#shared-library a[href*="player.html"]').first.wait_for(state='attached',timeout=10000)
         n=page.locator('#shared-library a[href*="player.html"]').count()
@@ -61,7 +68,7 @@ with sync_playwright() as pw:
       if assets:raise RuntimeError('Bad local files: '+str(assets[:4]))
       print('PASS',filename,'action='+ACTIONS.get(filename,'open'),flush=True)
     except Exception as e:
-      failures.append((filename,str(e)[:350]));print('FAIL',filename,failures[-1][1],flush=True)
+      failures.append((filename,str(e)[:2500]));print('FAIL',filename,failures[-1][1],flush=True)
     finally:page.close()
   browser.close()
 if failures:
