@@ -29,10 +29,10 @@ ACTIONS={
  'kids/coloring.html':'#magic',
  'adventures/fishing.html':'#catch',
 }
-# Known WebGL and third-party font issues are excluded; game JavaScript errors are not.
+# Use Chromium software WebGL on GPU-less CI runners; assert actual game start.
 failures=[]
 with sync_playwright() as pw:
-  browser=pw.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required'])
+  browser=pw.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
   context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,device_scale_factor=2,service_workers='block')
   for filename in PAGES:
     page=context.new_page(); errors=[];assets=[]
@@ -84,7 +84,7 @@ with sync_playwright() as pw:
       if intro.is_visible(): intro.click()
       launch=page.frame_locator('iframe').get_by_text('Запустить игру',exact=True)
       launch.click(timeout=60000)
-      page.wait_for_function("document.querySelector('#player-status').textContent.includes('Сохранения')",timeout=90000)
+      page.wait_for_function("document.querySelector('#player-status').textContent.startsWith('Поверни телефон горизонтально')",timeout=90000)
       print('PASS cartridge boot',cart['id'],flush=True)
     except Exception as e:
       failures.append((cart['id'],str(e)))
