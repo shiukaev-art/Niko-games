@@ -15,6 +15,9 @@ PAGES=[
  'repair.html','refresh-v18.html'
 ]
 ACTIONS={
+ 'beauty/index.html':'#start',
+ 'ossetian/index.html':'#start',
+ 'kids/math.html':'#answers button:first-child',
  'games/snake.html':'#start',
  'games/tetris.html':'#start',
  'games/runner.html':'#start',
@@ -70,6 +73,23 @@ with sync_playwright() as pw:
     except Exception as e:
       failures.append((filename,str(e)[:2500]));print('FAIL',filename,failures[-1][1],flush=True)
     finally:page.close()
+  # Test the internal emulator through its real parent handshake, for every ROM.
+  import json, urllib.request
+  catalog=json.load(urllib.request.urlopen(BASE+'retro/catalog.json'))
+  for cart in catalog['games']:
+    page=context.new_page()
+    try:
+      page.goto(BASE+'retro/player.html?id='+cart['id'],wait_until='domcontentloaded')
+      intro=page.locator('.niko-intro-skip')
+      if intro.is_visible(): intro.click()
+      launch=page.frame_locator('iframe').get_by_text('Запустить игру',exact=True)
+      launch.click(timeout=60000)
+      page.wait_for_function("document.querySelector('#player-status').textContent.includes('Сохранения')",timeout=90000)
+      print('PASS cartridge boot',cart['id'],flush=True)
+    except Exception as e:
+      failures.append((cart['id'],str(e)))
+      print('FAIL cartridge boot',cart['id'],str(e),flush=True)
+    finally: page.close()
   browser.close()
 if failures:
   print('FAILED:',len(failures),'/',len(PAGES),file=sys.stderr)
